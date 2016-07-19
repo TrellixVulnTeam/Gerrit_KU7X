@@ -1,0 +1,75 @@
+SRCS = [
+  'gerrit-server/src/main/java/',
+  'gerrit-httpd/src/main/java/',
+  'gerrit-sshd/src/main/java/',
+]
+
+PLUGIN_API = [
+  '//gerrit-httpd:httpd',
+  '//gerrit-pgm:init-api',
+  '//gerrit-server:server',
+  '//gerrit-sshd:sshd',
+]
+
+java_binary(
+  name = 'plugin-api',
+  deps = [':lib'],
+  visibility = ['PUBLIC'],
+)
+
+java_library(
+  name = 'lib',
+  exported_deps = PLUGIN_API + [
+    '//gerrit-antlr:query_exception',
+    '//gerrit-antlr:query_parser',
+    '//gerrit-common:annotations',
+    '//gerrit-common:server',
+    '//gerrit-extension-api:api',
+    '//gerrit-gwtexpui:server',
+    '//gerrit-reviewdb:server',
+    '//lib:args4j',
+    '//lib:blame-cache',
+    '//lib/dropwizard:dropwizard-core',
+    '//lib:guava',
+    '//lib:gwtorm',
+    '//lib:jsch',
+    '//lib:mime-util',
+    '//lib:servlet-api-3_1',
+    '//lib:velocity',
+    '//lib/commons:lang',
+    '//lib/guice:guice',
+    '//lib/guice:guice-assistedinject',
+    '//lib/guice:guice-servlet',
+    '//lib/jgit/org.eclipse.jgit:jgit',
+    '//lib/jgit/org.eclipse.jgit.http.server:jgit-servlet',
+    '//lib/joda:joda-time',
+    '//lib/log:api',
+    '//lib/mina:sshd',
+    '//lib/prolog:compiler',
+  ],
+  visibility = ['PUBLIC'],
+)
+
+java_binary(
+  name = 'plugin-api-src',
+  deps = [
+    '//gerrit-extension-api:extension-api-src',
+  ] + [d + '-src' for d in PLUGIN_API],
+  visibility = ['PUBLIC'],
+)
+
+java_doc(
+  name = 'plugin-api-javadoc',
+  title = 'Gerrit Review Plugin API Documentation',
+  pkgs = ['com.google.gerrit'],
+  paths = [n for n in SRCS],
+  srcs = glob([n + '**/*.java' for n in SRCS]),
+  deps = [
+    ':plugin-api',
+    '//lib/bouncycastle:bcprov',
+    '//lib/bouncycastle:bcpg',
+    '//lib/bouncycastle:bcpkix',
+  ],
+  visibility = ['PUBLIC'],
+  do_it_wrong = True,
+)
