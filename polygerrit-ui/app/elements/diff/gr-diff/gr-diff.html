@@ -1,0 +1,167 @@
+<!--
+Copyright (C) 2015 The Android Open Source Project
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+
+<link rel="import" href="../../../bower_components/polymer/polymer.html">
+<link rel="import" href="../../shared/gr-button/gr-button.html">
+<link rel="import" href="../../shared/gr-rest-api-interface/gr-rest-api-interface.html">
+<link rel="import" href="../gr-diff-builder/gr-diff-builder.html">
+<link rel="import" href="../gr-diff-comment-thread/gr-diff-comment-thread.html">
+<link rel="import" href="../gr-diff-highlight/gr-diff-highlight.html">
+<link rel="import" href="../gr-diff-selection/gr-diff-selection.html">
+
+<dom-module id="gr-diff">
+  <template>
+    <style>
+      :host {
+        --light-remove-highlight-color: #fee;
+        --dark-remove-highlight-color: #ffd4d4;
+        --light-add-highlight-color: #efe;
+        --dark-add-highlight-color: #d4ffd4;
+      }
+      .diffContainer {
+        border-bottom: 1px solid #eee;
+        border-top: 1px solid #eee;
+        display: flex;
+        font: 12px var(--monospace-font-family);
+        overflow-x: auto;
+        will-change: transform;
+      }
+      table {
+        border-collapse: collapse;
+        border-right: 1px solid #ddd;
+      }
+      .lineNum {
+        background-color: #eee;
+      }
+      .image-diff .gr-diff {
+        text-align: center;
+      }
+      .image-diff img {
+        max-width: 50em;
+        outline: 1px solid #ccc;
+      }
+      .image-diff label {
+        font-family: var(--font-family);
+        font-style: italic;
+      }
+      .diff-row.target-row.target-side-left .lineNum.left,
+      .diff-row.target-row.target-side-right .lineNum.right,
+      .diff-row.target-row.unified .lineNum {
+        background-color: #BBDEFB;
+      }
+      .diff-row.target-row.target-side-left .lineNum.left:before,
+      .diff-row.target-row.target-side-right .lineNum.right:before,
+      .diff-row.target-row.unified .lineNum:before {
+        color: #000;
+      }
+      .blank,
+      .content {
+        background-color: #fff;
+      }
+      .lineNum,
+      .content {
+        vertical-align: top;
+        white-space: pre;
+      }
+      .contextLineNum:before,
+      .lineNum:before {
+        display: inline-block;
+        color: #666;
+        content: attr(data-value);
+        padding: 0 .75em;
+        text-align: right;
+        width: 100%;
+      }
+      .canComment .lineNum[data-value] {
+        cursor: pointer;
+      }
+      .canComment .lineNum[data-value]:hover:before {
+        background-color: #ccc;
+      }
+      .canComment .lineNum[data-value="FILE"]:before {
+        content: 'File';
+      }
+      .content {
+        overflow: hidden;
+        /* Set max and min width since setting width on table cells still
+           allows them to shrink. */
+        max-width: var(--content-width, 80ch);
+        min-width: var(--content-width, 80ch);
+      }
+      .content.add hl,
+      .content.add.darkHighlight {
+        background-color: var(--dark-add-highlight-color);
+      }
+      .content.add.lightHighlight {
+        background-color: var(--light-add-highlight-color);
+      }
+      .content.remove hl,
+      .content.remove.darkHighlight {
+        background-color: var(--dark-remove-highlight-color);
+      }
+      .content.remove.lightHighlight {
+        background-color: var(--light-remove-highlight-color);
+      }
+      .contextControl {
+        background-color: #fef;
+        color: #849;
+      }
+      .contextControl gr-button {
+        display: inline-block;
+        font-family: var(--monospace-font-family);
+        text-decoration: none;
+      }
+      .contextControl td:not(.lineNum) {
+        text-align: center;
+      }
+      .br:after {
+        /* Line feed */
+        content: '\A';
+      }
+      .tab {
+        display: inline-block;
+      }
+      .tab.withIndicator:before {
+        color: #C62828;
+        /* >> character */
+        content: '\00BB';
+        position: absolute;
+      }
+    </style>
+    <div class$="[[_computeContainerClass(_loggedIn, viewMode)]]"
+        on-tap="_handleTap">
+      <gr-diff-selection>
+        <gr-diff-highlight
+            id="highlights"
+            logged-in="[[_loggedIn]]"
+            comments="[[_comments]]">
+          <gr-diff-builder
+              id="diffBuilder"
+              view-mode="[[viewMode]]"
+              is-image-diff="[[isImageDiff]]"
+              base-image="[[_baseImage]]"
+              revision-image="[[_revisionImage]]">
+            <table id="diffTable"></table>
+          </gr-diff-builder>
+        </gr-diff-highlight>
+      </gr-diff-selection>
+    </div>
+    <gr-rest-api-interface id="restAPI"></gr-rest-api-interface>
+  </template>
+  <script src="gr-diff-line.js"></script>
+  <script src="gr-diff-group.js"></script>
+  <script src="gr-diff.js"></script>
+</dom-module>

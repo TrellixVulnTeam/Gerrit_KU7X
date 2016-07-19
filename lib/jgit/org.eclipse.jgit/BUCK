@@ -1,0 +1,25 @@
+include_defs('//lib/maven.defs')
+include_defs('//lib/JGIT_VERSION')
+
+maven_jar(
+  name = 'jgit',
+  id = 'org.eclipse.jgit:org.eclipse.jgit:' + VERS,
+  bin_sha1 = 'dc4464c876cbf3815fd6cf6cb9d29d375566d6b1',
+  src_sha1 = 'ab3f9344d524f71c74307e68c82c698266e4bcec',
+  license = 'jgit',
+  repository = REPO,
+  unsign = True,
+  deps = [':ewah'],
+  exclude = [
+    'META-INF/eclipse.inf',
+    'about.html',
+    'plugin.properties',
+  ],
+)
+
+maven_jar(
+  name = 'ewah',
+  id = 'com.googlecode.javaewah:JavaEWAH:0.7.9',
+  sha1 = 'eceaf316a8faf0e794296ebe158ae110c7d72a5a',
+  license = 'Apache2.0',
+)

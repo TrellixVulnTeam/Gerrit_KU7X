@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<!--
+Copyright (C) 2016 The Android Open Source Project
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+
+<meta name="viewport" content="width=device-width, minimum-scale=1.0, initial-scale=1.0, user-scalable=yes">
+<title>gr-diff-highlight</title>
+
+<script src="../../../bower_components/webcomponentsjs/webcomponents.min.js"></script>
+<script src="../../../bower_components/web-component-tester/browser.js"></script>
+
+<link rel="import" href="../../../bower_components/iron-test-helpers/iron-test-helpers.html">
+<link rel="import" href="gr-diff-highlight.html">
+
+<test-fixture id="basic">
+  <template>
+    <gr-diff-highlight>
+      <table id="diffTable">
+
+        <tbody class="section both">
+          <tr class="diff-row side-by-side" left-type="both" right-type="both">
+            <td class="left lineNum" data-value="138">138</td>
+            <td class="content both darkHighlight"><div class="contentText">[14] Nam cum ad me in Cumanum salutandi causa uterque venisset,</div></td>
+            <td class="right lineNum" data-value="119">119</td>
+            <td class="content both darkHighlight"><div class="contentText">[14] Nam cum ad me in Cumanum salutandi causa uterque venisset,</div></td>
+          </tr>
+        </tbody>
+
+        <tbody class="section delta">
+          <tr class="diff-row side-by-side" left-type="remove" right-type="add">
+            <td class="left lineNum" data-value="140">140</td>
+            <!-- Next tag is formatted to eliminate zero-length text nodes. -->
+            <td class="content remove lightHighlight"><div class="contentText">na💢ti <hl class="foo">te, inquit</hl>, sumus <hl class="bar">aliquando</hl> otiosum, <hl>certe</hl> a <hl><span class="tab withIndicator" style="tab-size:8;"></span></hl>udiam, <hl>quid</hl> sit, <span class="tab withIndicator" style="tab-size:8;"></span>quod <hl>Epicurum</hl></div><gr-diff-comment-thread>
+                [Yet another random diff thread content here]
+              </gr-diff-comment-thread></td>
+            <td class="right lineNum" data-value="120">120</td>
+            <!-- Next tag is formatted to eliminate zero-length text nodes. -->
+            <td class="content add lightHighlight"><div class="contentText">nacti , <hl>,</hl> sumus <hl><span class="tab withIndicator" style="tab-size:8;"></span></hl> otiosum,  <span class="tab withIndicator" style="tab-size:8;"></span> audiam,  sit, quod</div></td>
+          </tr>
+        </tbody>
+
+        <tbody class="section both">
+          <tr class="diff-row side-by-side" left-type="both" right-type="both">
+            <td class="left lineNum" data-value="141"></td>
+            <td class="content both darkHighlight"><div class="contentText">nam et<hl><span class="tab withIndicator" style="tab-size:8;">	</span></hl>complectitur<span class="tab withIndicator" style="tab-size:8;">	</span>verbis, quod vult, et dicit plane, quod intellegam;</div></td>
+            <td class="right lineNum" data-value="130"></td>
+            <td class="content both darkHighlight"><div class="contentText">nam et complectitur verbis, quod vult, et dicit plane, quod intellegam;</div></td>
+          </tr>
+        </tbody>
+
+        <tbody class="section contextControl">
+          <tr class="diff-row side-by-side" left-type="contextControl" right-type="contextControl">
+            <td class="left contextLineNum" data-value="@@"></td>
+            <td>
+              <gr-button>+10↑</gr-button>
+              -
+              <gr-button>Show 21 common lines</gr-button>
+              -
+              <gr-button>+10↓</gr-button>
+            </td>
+            <td class="right contextLineNum" data-value="@@"></td>
+            <td>
+              <gr-button>+10↑</gr-button>
+              -
+              <gr-button>Show 21 common lines</gr-button>
+              -
+              <gr-button>+10↓</gr-button>
+            </td>
+          </tr>
+        </tbody>
+
+        <tbody class="section delta">
+          <tr class="diff-row side-by-side" left-type="blank" right-type="add">
+            <td class="left"></td>
+            <td class="blank darkHighlight"></td>
+            <td class="right lineNum" data-value="146"></td>
+            <td class="content add darkHighlight"><div class="contentText">[17] Quid igitur est? inquit; audire enim cupio, quid non probes. Principio, inquam,</div></td>
+          </tr>
+        </tbody>
+
+        <tbody class="section both">
+          <tr class="diff-row side-by-side" left-type="both" right-type="both">
+            <td class="left lineNum" data-value="165"></td>
+            <td class="content both darkHighlight"><div class="contentText">in physicis, quibus maxime gloriatur, primum totus est alienus. Democritea dicit</div></td>
+            <td class="right lineNum" data-value="147"></td>
+            <td class="content both darkHighlight"><div class="contentText">in physicis, <hl><span class="tab withIndicator" style="tab-size:8;">	</span></hl> quibus maxime gloriatur, primum totus est alienus. Democritea dicit</div></td>
+          </tr>
+        </tbody>
+
+      </table>
+    </gr-diff-highlight>
+  </template>
+</test-fixture>
+
+<test-fixture id="highlighted">
+  <template>
+    <div>
+      <hl class="rangeHighlight">foo</hl>
+      bar
+      <hl class="rangeHighlight">baz</hl>
+    </div>
+  </template>
+</test-fixture>
+
+<script>
+  suite('gr-diff-highlight', function() {
+    var element;
+    var sandbox;
+
+    setup(function() {
+      sandbox = sinon.sandbox.create();
+      element = fixture('basic');
+    });
+
+    teardown(function() {
+      sandbox.restore();
+    });
+
+    test('listens to selectionchange', function() {
+      sandbox.stub(element, '_handleSelection');
+      sandbox.stub(element, '_removeActionBox');
+      document.dispatchEvent(new CustomEvent('selectionchange'));
+      element.flushDebouncer('selectionChange');
+      assert.isTrue(element._handleSelection.called);
+      element.flushDebouncer('removeActionBox');
+      assert.isTrue(element._removeActionBox.called);
+    });
+
+    suite('comment events', function() {
+      var builder;
+
+      setup(function() {
+        builder = {
+          getContentsByLineRange: sandbox.stub().returns([]),
+          getLineElByChild: sandbox.stub().returns({}),
+          getSideByLineEl: sandbox.stub().returns('other-side'),
+          renderLineRange: sandbox.stub(),
+        };
+        element._cachedDiffBuilder = builder;
+      });
+
+      test('ignores thread discard for line comment', function(done) {
+        element.fire('thread-discard', {lastComment: {}});
+        flush(function() {
+          assert.isFalse(builder.renderLineRange.called);
+          done();
+        });
+      });
+
+      test('ignores comment discard for line comment', function(done) {
+        element.fire('comment-discard', {comment: {}});
+        flush(function() {
+          assert.isFalse(builder.renderLineRange.called);
+          done();
+        });
+      });
+
+      test('renders lines in comment range on thread discard', function(done) {
+        element.fire('thread-discard', {
+          lastComment: {
+            range: {
+              start_line: 10,
+              end_line: 24,
+            },
+          },
+        });
+        flush(function() {
+          assert.isTrue(
+              builder.renderLineRange.calledWithExactly(10, 24, 'other-side'));
+          done();
+        });
+      });
+
+      test('renders lines in comment range on comment discard', function(done) {
+        element.fire('comment-discard', {
+          comment: {
+            range: {
+              start_line: 10,
+              end_line: 24,
+            },
+          },
+        });
+        flush(function() {
+          assert.isTrue(
+              builder.renderLineRange.calledWithExactly(10, 24, 'other-side'));
+          done();
+        });
+      });
+
+      test('comment-mouse-over from line comments is ignored', function() {
+        sandbox.stub(element, '_applyRangedHighlight');
+        element.fire('comment-mouse-over', {comment: {}});
+        assert.isFalse(element._applyRangedHighlight.called);
+      });
+
+      test('comment-mouse-out from line comments is ignored', function() {
+        element.fire('comment-mouse-over', {comment: {}});
+        assert.isFalse(builder.getContentsByLineRange.called);
+      });
+
+      test('on comment-mouse-out highlight classes are removed', function() {
+        var testEl = fixture('highlighted');
+        builder.getContentsByLineRange.returns([testEl]);
+        element.fire('comment-mouse-out', {
+          comment: {
+            range: {
+              start_line: 3,
+              start_character: 14,
+              end_line: 10,
+              end_character: 24,
+            }
+          }});
+        assert.isTrue(builder.getContentsByLineRange.calledWithExactly(
+            3, 10, 'other-side'));
+        assert.equal(0, testEl.querySelectorAll('.rangeHighlight').length);
+        assert.equal(2, testEl.querySelectorAll('.range').length);
+      });
+
+      test('on comment-mouse-over range is highlighted', function() {
+        sandbox.stub(element, '_applyRangedHighlight');
+        element.fire('comment-mouse-over', {
+          comment: {
+            range: {
+              start_line: 3,
+              start_character: 14,
+              end_line: 10,
+              end_character: 24,
+            },
+          }});
+        assert.isTrue(element._applyRangedHighlight.calledWithExactly(
+            'rangeHighlight', 3, 14, 10, 24, 'other-side'));
+      });
+
+      test('on create-comment range is highlighted', function() {
+        sandbox.stub(element, '_applyRangedHighlight');
+        element.fire('create-comment', {
+          range: {
+            startLine: 3,
+            startChar: 14,
+            endLine: 10,
+            endChar: 24,
+          },
+          side: 'some-side',
+        });
+        assert.isTrue(element._applyRangedHighlight.calledWithExactly(
+            'range', 3, 14, 10, 24, 'some-side'));
+      });
+
+      test('on create-comment action box is removed', function() {
+        sandbox.stub(element, '_applyRangedHighlight');
+        sandbox.stub(element, '_removeActionBox');
+        element.fire('create-comment', {
+          comment: {
+            range: {},
+          },
+        });
+        assert.isTrue(element._removeActionBox.called);
+      });
+    });
+
+    test('apply multiline highlight', function() {
+      var diff = element.querySelector('#diffTable');
+      var startContent = diff.querySelector(
+          '.left.lineNum[data-value="138"] ~ .content .contentText');
+      var betweenContent = diff.querySelector(
+          '.left.lineNum[data-value="140"] ~ .content .contentText');
+      var endContent = diff.querySelector(
+          '.left.lineNum[data-value="141"] ~ .content .contentText');
+      var builder = {
+        getContentByLine: sandbox.stub().returns({}),
+        getContentsByLineRange: sandbox.stub().returns([betweenContent]),
+        getLineElByChild: sandbox.stub().returns(
+            {getAttribute: sandbox.stub()}),
+      };
+      element._cachedDiffBuilder = builder;
+      builder.getContentByLine.withArgs(138, 'left').returns(
+          startContent);
+      builder.getContentByLine.withArgs(141, 'left').returns(
+          endContent);
+      element._applyRangedHighlight('some', 138, 4, 141, 28, 'left');
+      assert.instanceOf(startContent.childNodes[0], Text);
+      assert.equal(startContent.childNodes[0].textContent, '[14]');
+      assert.instanceOf(startContent.childNodes[1], Element);
+      assert.equal(startContent.childNodes[1].textContent,
+          ' Nam cum ad me in Cumanum salutandi causa uterque venisset,');
+      assert.equal(startContent.childNodes[1].tagName, 'HL');
+      assert.equal(startContent.childNodes[1].className, 'some');
+
+      assert.instanceOf(betweenContent.firstChild, Element);
+      assert.equal(betweenContent.firstChild.tagName, 'HL');
+      assert.equal(betweenContent.firstChild.className, 'some');
+      assert.equal(betweenContent.childNodes.length, 1);
+      assert.equal(betweenContent.firstChild.childNodes.length, 5);
+      assert.equal(betweenContent.firstChild.textContent,
+          'na💢ti te, inquit, sumus aliquando otiosum, certe a udiam, ' +
+          'quid sit, quod Epicurum');
+
+      assert.isNull(diff.querySelector('.right + .content .some'),
+          'Highlight should be applied only to the left side content.');
+
+      assert.instanceOf(endContent.childNodes[0], Element);
+      assert.equal(endContent.childNodes[0].textContent,
+          'nam et\tcomplectitur\tverbis, ');
+      assert.equal(endContent.childNodes[0].tagName, 'HL');
+      assert.equal(endContent.childNodes[0].className, 'some');
+      assert.instanceOf(endContent.childNodes[1], Text);
+      assert.equal(endContent.childNodes[1].textContent,
+          'quod vult, et dicit plane, quod intellegam;');
+      var endHl = endContent.querySelector('hl.some');
+      assert.equal(endHl.childNodes.length, 5);
+      var tabs = endHl.querySelectorAll('span.tab');
+      assert.equal(tabs.length, 2);
+      assert.equal(tabs[0].previousSibling.textContent, 'nam et');
+      assert.equal(tabs[1].previousSibling.textContent, 'complectitur');
+      assert.equal(tabs[1].nextSibling.textContent, 'verbis, ');
+    });
+
+    test('multiline highlight w/ start at end of 1st line', function() {
+      var diff = element.querySelector('#diffTable');
+      var startContent =
+          diff.querySelector('.left.lineNum[data-value="138"] ~ .content');
+      var betweenContent =
+          diff.querySelector('.left.lineNum[data-value="140"] ~ .content');
+      var endContent =
+          diff.querySelector('.left.lineNum[data-value="141"] ~ .content');
+      var commentThread =
+          diff.querySelector('gr-diff-comment-thread');
+      var builder = {
+        getCommentThreadByContentEl: sandbox.stub().returns(commentThread),
+        getContentByLine: sandbox.stub().returns({}),
+        getContentsByLineRange: sandbox.stub().returns([betweenContent]),
+        getLineElByChild: sandbox.stub().returns(
+            {getAttribute: sandbox.stub()}),
+      };
+      element._cachedDiffBuilder = builder;
+      builder.getContentByLine.withArgs(138, 'left').returns(
+          startContent);
+      builder.getContentByLine.withArgs(141, 'left').returns(
+          endContent);
+
+      var expectedStartContentNodes = startContent.childNodes.length;
+
+      // The following should not cause an error.
+      element._applyRangedHighlight(
+          'some', 138, startContent.textContent.length, 141, 28, 'left');
+
+      assert.equal(startContent.childNodes.length, expectedStartContentNodes,
+          'Should not add a highlight to the start content');
+    });
+
+    suite('single line ranges', function() {
+      var diff;
+      var contentText;
+      var commentThread;
+      var builder;
+
+      setup(function() {
+        diff = element.querySelector('#diffTable');
+        var contentTd = diff.querySelector(
+            '.left.lineNum[data-value="140"] ~ .content');
+        contentText = contentTd.querySelector('.contentText');
+        commentThread = diff.querySelector('gr-diff-comment-thread');
+        builder = {
+          getCommentThreadByContentEl: sandbox.stub().returns(commentThread),
+          getContentByLine: sandbox.stub().returns(contentText),
+          getContentsByLineRange: sandbox.stub().returns([]),
+          getLineElByChild: sandbox.stub().returns(
+              {getAttribute: sandbox.stub()}),
+        };
+        element._cachedDiffBuilder = builder;
+      });
+
+      test('whole line range', function() {
+        element._applyRangedHighlight('some', 140, 0, 140, 81, 'left');
+        assert.equal(contentText.childNodes.length, 1);
+        assert.instanceOf(contentText.firstChild, Element);
+        assert.equal(contentText.firstChild.tagName, 'HL');
+        assert.equal(contentText.firstChild.className, 'some');
+        assert.equal(contentText.firstChild.childNodes.length, 5);
+        assert.equal(contentText.firstChild.textContent,
+            'na💢ti te, inquit, sumus aliquando otiosum, certe a udiam, ' +
+            'quid sit, quod Epicurum');
+        var tabs = contentText.querySelectorAll('span.tab');
+        assert.equal(tabs.length, 2);
+        assert.strictEqual(tabs[1].previousSibling, tabs[0].nextSibling);
+        assert.equal(tabs[0].previousSibling.textContent,
+            'na💢ti te, inquit, sumus aliquando otiosum, certe a ');
+        assert.equal(tabs[1].previousSibling.textContent,
+            'udiam, quid sit, ');
+        assert.equal(tabs[1].nextSibling.textContent, 'quod Epicurum');
+      });
+
+      test('merging multiple other hls', function() {
+        element._applyRangedHighlight('some', 140, 1, 140, 80, 'left');
+        assert.instanceOf(contentText.firstChild, Text);
+        assert.equal(contentText.childNodes.length, 3);
+        var hl = contentText.querySelector('hl.some');
+        assert.strictEqual(contentText.firstChild, hl.previousSibling);
+        assert.equal(hl.childNodes.length, 5);
+        assert.equal(contentText.querySelectorAll('span.tab').length, 2);
+        assert.equal(hl.textContent,
+            'a💢ti te, inquit, sumus aliquando otiosum, certe a udiam, ' +
+            'quid sit, quod Epicuru');
+      });
+
+      test('hl inside Text node', function() {
+        // Before: na💢ti
+        //  After: n<hl class="some">a💢t</hl>i
+        element._applyRangedHighlight('some', 140, 1, 140, 4, 'left');
+        var hl = contentText.querySelector('hl.some');
+        assert.equal(hl.outerHTML, '<hl class="some">a💢t</hl>');
+      });
+
+      test('hl ending over different hl', function() {
+        // Before: na💢ti <hl>te, inquit</hl>,
+        //  After: na💢<hl class="some">ti te</hl><hl class="foo">, inquit</hl>,
+        element._applyRangedHighlight('some', 140, 3, 140, 8, 'left');
+        var hl = contentText.querySelector('hl.some');
+        assert.equal(hl.outerHTML, '<hl class="some">ti te</hl>');
+        assert.equal(hl.nextSibling.outerHTML,
+            '<hl class="foo">, inquit</hl>');
+      });
+
+      test('hl starting inside different hl', function() {
+        // Before: na💢ti <hl>te, inquit</hl>, sumus
+        //  After: na💢ti <hl class="foo">te, in</hl><hl class="some">quit, ...
+        element._applyRangedHighlight('some', 140, 12, 140, 21, 'left');
+        var hl = contentText.querySelector('hl.some');
+        assert.equal(hl.textContent, 'quit, sum');
+        assert.equal(
+            hl.previousSibling.outerHTML, '<hl class="foo">te, in</hl>');
+      });
+
+      test('hl inside different hl', function() {
+        // Before: na💢ti <hl class="foo">te, inquit</hl>, sumus
+        //  After: <hl class="foo">t</hl><hl="some">e, i</hl><hl class="foo">n..
+        element._applyRangedHighlight('some', 140, 7, 140, 12, 'left');
+        var hl = contentText.querySelector('hl.some');
+        assert.equal(hl.textContent, 'e, in');
+        assert.equal(hl.previousSibling.outerHTML, '<hl class="foo">t</hl>');
+        assert.equal(hl.nextSibling.outerHTML, '<hl class="foo">quit</hl>');
+      });
+
+      test('hl starts and ends in different hls', function() {
+        element._applyRangedHighlight('some', 140, 8, 140, 27, 'left');
+        var hl = contentText.querySelector('hl.some');
+        assert.equal(hl.textContent, ', inquit, sumus ali');
+        assert.equal(hl.previousSibling.outerHTML, '<hl class="foo">te</hl>');
+        assert.equal(hl.nextSibling.outerHTML, '<hl class="bar">quando</hl>');
+      });
+
+      test('hl over different hl', function() {
+        element._applyRangedHighlight('some', 140, 2, 140, 21, 'left');
+        var hl = contentText.querySelector('hl.some');
+        assert.equal(hl.outerHTML, '<hl class="some">💢ti te, inquit, sum</hl>');
+        assert.notOk(contentText.querySelector('.foo'));
+      });
+
+      test('hl starting and ending in boundaries', function() {
+        element._applyRangedHighlight('some', 140, 6, 140, 33, 'left');
+        var hl = contentText.querySelector('hl.some');
+        assert.equal(hl.textContent, 'te, inquit, sumus aliquando');
+        assert.notOk(contentText.querySelector('.bar'));
+      });
+
+      test('overlapping hls', function() {
+        element._applyRangedHighlight('some', 140, 1, 140, 3, 'left');
+        element._applyRangedHighlight('some', 140, 2, 140, 4, 'left');
+        assert.equal(contentText.querySelectorAll('hl.some').length, 1);
+        var hl = contentText.querySelector('hl.some');
+        assert.equal(hl.outerHTML, '<hl class="some">a💢t</hl>');
+      });
+
+      test('growing hl right including another hl', function() {
+        element._applyRangedHighlight('some', 140, 1, 140, 4, 'left');
+        element._applyRangedHighlight('some', 140, 3, 140, 10, 'left');
+        assert.equal(contentText.querySelectorAll('hl.some').length, 1);
+        var hl = contentText.querySelector('hl.some');
+        assert.equal(hl.outerHTML, '<hl class="some">a💢ti te, </hl>');
+        assert.equal(hl.nextSibling.outerHTML, '<hl class="foo">inquit</hl>');
+      });
+
+      test('growing hl left to start of line', function() {
+        element._applyRangedHighlight('some', 140, 2, 140, 5, 'left');
+        element._applyRangedHighlight('some', 140, 0, 140, 3, 'left');
+        assert.equal(contentText.querySelectorAll('hl.some').length, 1);
+        var hl = contentText.querySelector('hl.some');
+        assert.equal(hl.outerHTML, '<hl class="some">na💢ti</hl>');
+        assert.strictEqual(contentText.firstChild, hl);
+      });
+
+      test('splitting hl containing a tab', function() {
+        element._applyRangedHighlight('some', 140, 63, 140, 72, 'left');
+        assert.equal(contentText.querySelector('hl.some').textContent,
+            'sit, quod');
+        element._applyRangedHighlight('another', 140, 66, 140, 81, 'left');
+        assert.equal(contentText.querySelector('hl.another').textContent,
+            ', quod Epicurum');
+      });
+    });
+
+    test('_applyAllHighlights', function() {
+      element.comments = {
+        left: [
+          {
+            range: {
+              start_line: 3,
+              start_character: 14,
+              end_line: 10,
+              end_character: 24,
+            },
+          },
+        ],
+        right: [
+          {
+            range: {
+              start_line: 320,
+              start_character: 200,
+              end_line: 1024,
+              end_character: 768,
+            },
+          },
+        ],
+      };
+      sandbox.stub(element, '_applyRangedHighlight');
+      element._applyAllHighlights();
+      sinon.assert.calledWith(element._applyRangedHighlight,
+          'range', 3, 14, 10, 24, 'left');
+      sinon.assert.calledWith(element._applyRangedHighlight,
+          'range', 320, 200, 1024, 768, 'right');
+    });
+
+    test('apply comment ranges on render', function() {
+      sandbox.stub(element, '_applyAllHighlights');
+      element.fire('render');
+      assert.isTrue(element._applyAllHighlights.called);
+    });
+
+    test('apply comment ranges on context expand', function() {
+      sandbox.stub(element, '_applyAllHighlights');
+      element.fire('show-context');
+      assert.isTrue(element._applyAllHighlights.called);
+    });
+
+    suite('selection', function() {
+      var diff;
+      var builder;
+      var contentStubs;
+
+      var stubContent = function(line, side, opt_child) {
+        var contentTd = diff.querySelector(
+            '.' + side + '.lineNum[data-value="' + line + '"] ~ .content');
+        var contentText = contentTd.querySelector('.contentText');
+        var lineEl = diff.querySelector(
+            '.' + side + '.lineNum[data-value="' + line + '"]');
+        contentStubs.push({
+          lineEl: lineEl,
+          contentTd: contentTd,
+          contentText: contentText,
+        });
+        builder.getContentByLineEl.withArgs(lineEl).returns(contentText);
+        builder.getLineNumberByChild.withArgs(lineEl).returns(line);
+        builder.getContentByLine.withArgs(line, side).returns(contentText);
+        builder.getSideByLineEl.withArgs(lineEl).returns(side);
+        return contentText;
+      };
+
+      var emulateSelection = function(
+          startNode, startOffset, endNode, endOffset) {
+        var selection = window.getSelection();
+        var range = document.createRange();
+        range.setStart(startNode, startOffset);
+        range.setEnd(endNode, endOffset);
+        selection.addRange(range);
+        element._handleSelection();
+      };
+
+      var getActionRange = function() {
+        return Polymer.dom(element.root).querySelector(
+            'gr-selection-action-box').range;
+      };
+
+      var getActionSide = function() {
+        return Polymer.dom(element.root).querySelector(
+            'gr-selection-action-box').side;
+      };
+
+      var getLineElByChild = function(node) {
+        var stubs = contentStubs.find(function(stub) {
+          return stub.contentTd.contains(node);
+        });
+        return stubs && stubs.lineEl;
+      };
+
+      setup(function() {
+        contentStubs = [];
+        stub('gr-selection-action-box', {
+          placeAbove: sandbox.stub(),
+        });
+        diff = element.querySelector('#diffTable');
+        builder = {
+          getContentByLine: sandbox.stub(),
+          getContentByLineEl: sandbox.stub(),
+          getLineElByChild: getLineElByChild,
+          getLineNumberByChild: sandbox.stub(),
+          getSideByLineEl: sandbox.stub(),
+        };
+        element._cachedDiffBuilder = builder;
+      });
+
+      teardown(function() {
+        contentStubs = null;
+        window.getSelection().removeAllRanges();
+      });
+
+      test('single line', function() {
+        var content = stubContent(138, 'left');
+        emulateSelection(content.firstChild, 5, content.firstChild, 12);
+        assert.isTrue(element.isRangeSelected());
+        assert.deepEqual(getActionRange(), {
+          startLine: 138,
+          startChar: 5,
+          endLine: 138,
+          endChar: 12,
+        });
+        assert.equal(getActionSide(), 'left');
+      });
+
+      test('multiline', function() {
+        var startContent = stubContent(119, 'right');
+        var endContent = stubContent(120, 'right');
+        emulateSelection(
+            startContent.firstChild, 10, endContent.lastChild, 7);
+        assert.isTrue(element.isRangeSelected());
+        assert.deepEqual(getActionRange(), {
+          startLine: 119,
+          startChar: 10,
+          endLine: 120,
+          endChar: 34,
+        });
+        assert.equal(getActionSide(), 'right');
+      });
+
+      test('multiline grow end highlight over tabs', function() {
+        var startContent = stubContent(119, 'right');
+        var endContent = stubContent(120, 'right');
+        emulateSelection(startContent.firstChild, 10, endContent.firstChild, 2);
+        assert.isTrue(element.isRangeSelected());
+        assert.deepEqual(getActionRange(), {
+          startLine: 119,
+          startChar: 10,
+          endLine: 120,
+          endChar: 2,
+        });
+        assert.equal(getActionSide(), 'right');
+      });
+
+      test('collapsed', function() {
+        var content = stubContent(138, 'left');
+        emulateSelection(content.firstChild, 5, content.firstChild, 5);
+        assert.isOk(window.getSelection().getRangeAt(0).startContainer);
+        assert.isFalse(element.isRangeSelected());
+      });
+
+      test('starts inside hl', function() {
+        var content = stubContent(140, 'left');
+        var hl = content.querySelector('.foo');
+        emulateSelection(hl.firstChild, 2, hl.nextSibling, 7);
+        assert.isTrue(element.isRangeSelected());
+        assert.deepEqual(getActionRange(), {
+          startLine: 140,
+          startChar: 8,
+          endLine: 140,
+          endChar: 23,
+        });
+        assert.equal(getActionSide(), 'left');
+      });
+
+      test('ends inside hl', function() {
+        var content = stubContent(140, 'left');
+        var hl = content.querySelector('.bar');
+        emulateSelection(hl.previousSibling, 2, hl.firstChild, 3);
+        assert.isTrue(element.isRangeSelected());
+        assert.deepEqual(getActionRange(), {
+          startLine: 140,
+          startChar: 18,
+          endLine: 140,
+          endChar: 27,
+        });
+      });
+
+      test('multiple hl', function() {
+        var content = stubContent(140, 'left');
+        var hl = content.querySelectorAll('hl')[4];
+        emulateSelection(content.firstChild, 2, hl.firstChild, 2);
+        assert.isTrue(element.isRangeSelected());
+        assert.deepEqual(getActionRange(), {
+          startLine: 140,
+          startChar: 2,
+          endLine: 140,
+          endChar: 60,
+        });
+        assert.equal(getActionSide(), 'left');
+      });
+
+      test('starts outside of diff', function() {
+        var contentText = stubContent(140, 'left');
+        var contentTd = contentText.parentElement;
+
+        emulateSelection(contentTd.previousElementSibling.firstChild, 2,
+            contentText.firstChild, 2);
+        assert.isFalse(element.isRangeSelected());
+      });
+
+      test('ends outside of diff', function() {
+        var content = stubContent(140, 'left');
+        emulateSelection(content.nextElementSibling.firstChild, 2,
+            content.firstChild, 2);
+        assert.isFalse(element.isRangeSelected());
+      });
+
+      test('starts and ends on different sides', function() {
+        var startContent = stubContent(140, 'left');
+        var endContent = stubContent(130, 'right');
+        emulateSelection(startContent.firstChild, 2, endContent.firstChild, 2);
+        assert.isFalse(element.isRangeSelected());
+      });
+
+      test('starts in comment thread element', function() {
+        var startContent = stubContent(140, 'left');
+        var comment = startContent.parentElement.querySelector(
+            'gr-diff-comment-thread');
+        var endContent = stubContent(141, 'left');
+        emulateSelection(comment.firstChild, 2, endContent.firstChild, 4);
+        assert.isTrue(element.isRangeSelected());
+        assert.deepEqual(getActionRange(), {
+          startLine: 140,
+          startChar: 81,
+          endLine: 141,
+          endChar: 4,
+        });
+        assert.equal(getActionSide(), 'left');
+      });
+
+      test('ends in comment thread element', function() {
+        var content = stubContent(140, 'left');
+        var comment = content.parentElement.querySelector(
+            'gr-diff-comment-thread');
+        emulateSelection(content.firstChild, 4, comment.firstChild, 1);
+        assert.isTrue(element.isRangeSelected());
+        assert.deepEqual(getActionRange(), {
+          startLine: 140,
+          startChar: 4,
+          endLine: 140,
+          endChar: 81,
+        });
+        assert.equal(getActionSide(), 'left');
+      });
+
+      test('starts in context element', function() {
+        var contextControl = diff.querySelector('.contextControl');
+        var content = stubContent(146, 'right');
+        emulateSelection(contextControl, 0, content.firstChild, 7);
+        // TODO (viktard): Select nearest line.
+        assert.isFalse(element.isRangeSelected());
+      });
+
+      test('ends in context element', function() {
+        var contextControl = diff.querySelector('.contextControl');
+        var content = stubContent(141, 'left');
+        emulateSelection(content.firstChild, 2, contextControl, 0);
+        // TODO (viktard): Select nearest line.
+        assert.isFalse(element.isRangeSelected());
+      });
+
+      test('selection containing context element', function() {
+        var startContent = stubContent(130, 'right');
+        var endContent = stubContent(146, 'right');
+        emulateSelection(startContent.firstChild, 3, endContent.firstChild, 14);
+        assert.isTrue(element.isRangeSelected());
+        assert.deepEqual(getActionRange(), {
+          startLine: 130,
+          startChar: 3,
+          endLine: 146,
+          endChar: 14,
+        });
+        assert.equal(getActionSide(), 'right');
+      });
+
+      test('ends at a tab', function() {
+        var content = stubContent(140, 'left');
+        emulateSelection(
+            content.firstChild, 1, content.querySelector('span'), 0);
+        assert.isTrue(element.isRangeSelected());
+        assert.deepEqual(getActionRange(), {
+          startLine: 140,
+          startChar: 1,
+          endLine: 140,
+          endChar: 51,
+        });
+        assert.equal(getActionSide(), 'left');
+      });
+
+      test('starts at a tab', function() {
+        var content = stubContent(140, 'left');
+        emulateSelection(
+            content.querySelectorAll('hl')[3], 0,
+            content.querySelectorAll('span')[1], 0);
+        assert.isTrue(element.isRangeSelected());
+        assert.deepEqual(getActionRange(), {
+          startLine: 140,
+          startChar: 51,
+          endLine: 140,
+          endChar: 68,
+        });
+        assert.equal(getActionSide(), 'left');
+      });
+
+      // TODO (viktard): Selection starts in line number.
+      // TODO (viktard): Empty lines in selection start.
+      // TODO (viktard): Empty lines in selection end.
+      // TODO (viktard): Only empty lines selected.
+      // TODO (viktard): Unified mode.
+    });
+  });
+</script>

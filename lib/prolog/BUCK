@@ -1,0 +1,64 @@
+include_defs('//lib/maven.defs')
+
+VERSION = '1.4.1'
+REPO = GERRIT
+
+maven_jar(
+  name = 'runtime',
+  id = 'com.googlecode.prolog-cafe:prolog-runtime:' + VERSION,
+  sha1 = 'c5d9f92e49c485969dcd424dfc0c08125b5f8246',
+  license = 'prologcafe',
+  repository = REPO,
+)
+
+maven_jar(
+  name = 'compiler',
+  id = 'com.googlecode.prolog-cafe:prolog-compiler:' + VERSION,
+  sha1 = 'ac24044c6ec166fdcb352b78b80d187ead3eff41',
+  license = 'prologcafe',
+  repository = REPO,
+  deps = [
+    ':io',
+    ':runtime',
+  ],
+)
+
+maven_jar(
+  name = 'io',
+  id = 'com.googlecode.prolog-cafe:prolog-io:' + VERSION,
+  sha1 = 'b072426a4b1b8af5e914026d298ee0358a8bb5aa',
+  license = 'prologcafe',
+  repository = REPO,
+  deps = [':runtime'],
+  visibility = [],
+)
+
+maven_jar(
+  name = 'cafeteria',
+  id = 'com.googlecode.prolog-cafe:prolog-cafeteria:' + VERSION,
+  sha1 = '8cbc3b0c19e7167c42d3f11667b21cb21ddec641',
+  license = 'prologcafe',
+  repository = REPO,
+  deps = [
+    ':io',
+    ':runtime',
+  ],
+  visibility = ['//gerrit-pgm:'],
+)
+
+java_binary(
+  name = 'compiler_bin',
+  main_class = 'BuckPrologCompiler',
+  deps = [':compiler_lib'],
+  visibility = ['PUBLIC'],
+)
+
+java_library(
+  name = 'compiler_lib',
+  srcs = ['java/BuckPrologCompiler.java'],
+  deps = [
+    ':compiler',
+    ':runtime',
+  ],
+  visibility = ['//tools/eclipse:classpath'],
+)

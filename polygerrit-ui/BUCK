@@ -1,0 +1,32 @@
+include_defs('//lib/js.defs')
+
+bower_components(
+  name = 'polygerrit_components',
+  deps = [
+    '//lib/js:fetch',
+    '//lib/js:iron-autogrow-textarea',
+    '//lib/js:iron-dropdown',
+    '//lib/js:iron-input',
+    '//lib/js:iron-overlay-behavior',
+    '//lib/js:iron-selector',
+    '//lib/js:moment',
+    '//lib/js:page',
+    '//lib/js:polymer',
+    '//lib/js:promise-polyfill',
+  ],
+)
+
+genrule(
+  name = 'fonts',
+  cmd = ' && '.join([
+    'cd $TMP',
+    'for file in $SRCS; do unzip -q $file; done',
+    'zip -q $OUT *',
+  ]),
+  srcs = [
+    '//lib/fonts:sourcecodepro',
+    '//lib/fonts:opensans',
+  ],
+  out = 'fonts.zip',
+  visibility = ['PUBLIC'],
+)

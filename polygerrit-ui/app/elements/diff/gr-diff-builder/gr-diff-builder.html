@@ -1,0 +1,274 @@
+<!--
+Copyright (C) 2016 The Android Open Source Project
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+<link rel="import" href="../../../bower_components/polymer/polymer.html">
+<link rel="import" href="../gr-diff-processor/gr-diff-processor.html">
+
+<dom-module id="gr-diff-builder">
+  <template>
+    <div class="contentWrapper">
+      <content></content>
+    </div>
+    <gr-diff-processor
+        id="processor"
+        groups="{{_groups}}"></gr-diff-processor>
+  </template>
+  <script src="../gr-diff/gr-diff-line.js"></script>
+  <script src="../gr-diff/gr-diff-group.js"></script>
+  <script src="../gr-diff-highlight/gr-annotation.js"></script>
+  <script src="gr-diff-builder.js"></script>
+  <script src="gr-diff-builder-side-by-side.js"></script>
+  <script src="gr-diff-builder-unified.js"></script>
+  <script src="gr-diff-builder-image.js"></script>
+  <script>
+    (function() {
+      'use strict';
+
+      var DiffViewMode = {
+        SIDE_BY_SIDE: 'SIDE_BY_SIDE',
+        UNIFIED: 'UNIFIED_DIFF',
+      };
+
+      Polymer({
+        is: 'gr-diff-builder',
+
+        /**
+         * Fired when the diff is rendered.
+         *
+         * @event render
+         */
+
+        properties: {
+          viewMode: String,
+          isImageDiff: Boolean,
+          baseImage: Object,
+          revisionImage: Object,
+          _builder: Object,
+          _groups: Array,
+        },
+
+        get diffElement() {
+          return this.queryEffectiveChildren('#diffTable');
+        },
+
+        observers: [
+          '_groupsChanged(_groups.splices)',
+        ],
+
+        render: function(diff, comments, prefs) {
+          // Stop the processor (if it's running).
+          this.$.processor.cancel();
+
+          this._builder = this._getDiffBuilder(diff, comments, prefs);
+
+          this.$.processor.context = prefs.context;
+          this.$.processor.keyLocations = this._getCommentLocations(comments);
+
+          this._clearDiffContent();
+
+          console.time('diff render');
+          this.$.processor.process(diff.content).then(function() {
+            if (this.isImageDiff) {
+              this._builder.renderDiffImages();
+            }
+            console.timeEnd('diff render');
+            this.fire('render');
+          }.bind(this));
+        },
+
+        getLineElByChild: function(node) {
+          while (node) {
+            if (node instanceof Element) {
+              if (node.classList.contains('lineNum')) {
+                return node;
+              }
+              if (node.classList.contains('section')) {
+                return null;
+              }
+            }
+            node = node.previousSibling || node.parentElement;
+          }
+          return null;
+        },
+
+        getLineNumberByChild: function(node) {
+          var lineEl = this.getLineElByChild(node);
+          return lineEl ?
+              parseInt(lineEl.getAttribute('data-value'), 10) : null;
+        },
+
+        renderLineRange: function(startLine, endLine, opt_side) {
+          var groups =
+              this._builder.getGroupsByLineRange(startLine, endLine, opt_side);
+          groups.forEach(function(group) {
+            var newElement = this._builder.buildSectionElement(group);
+            var oldElement = group.element;
+
+            // Transfer comment threads from existing section to new one.
+            var threads = Polymer.dom(newElement).querySelectorAll(
+                'gr-diff-comment-thread');
+            threads.forEach(function(threadEl) {
+              var lineEl = this.getLineElByChild(threadEl, oldElement);
+              if (!lineEl) { // New comment thread.
+                return;
+              }
+              var side = this.getSideByLineEl(lineEl);
+              var line = lineEl.getAttribute('data-value');
+              var oldThreadEl =
+                  this.getCommentThreadByLine(line, side, oldElement);
+              threadEl.parentNode.replaceChild(oldThreadEl, threadEl);
+            }, this);
+
+            // Replace old group elements with new ones.
+            group.element.parentNode.replaceChild(newElement, group.element);
+            group.element = newElement;
+          }, this);
+
+          this.async(function() {
+            this.fire('render');
+          }, 1);
+        },
+
+        getContentByLine: function(lineNumber, opt_side, opt_root) {
+          var root = Polymer.dom(opt_root || this.diffElement);
+          var sideSelector = !!opt_side ? ('.' + opt_side) : '';
+          return root.querySelector('td.lineNum[data-value="' + lineNumber +
+              '"]' + sideSelector + ' ~ td.content .contentText');
+        },
+
+        getContentByLineEl: function(lineEl) {
+          var root = Polymer.dom(lineEl.parentElement);
+          var side = this.getSideByLineEl(lineEl);
+          var line = lineEl.getAttribute('data-value');
+          return this.getContentByLine(line, side, root);
+        },
+
+        getLineElByNumber: function(lineNumber, opt_side) {
+          var sideSelector = !!opt_side ? ('.' + opt_side) : '';
+          return this.diffElement.querySelector(
+              '.lineNum[data-value="' + lineNumber + '"]' + sideSelector);
+        },
+
+        getContentsByLineRange: function(startLine, endLine, opt_side) {
+          var groups =
+              this._builder.getGroupsByLineRange(startLine, endLine, opt_side);
+          // In each group, search Element for lines in range.
+          return groups.reduce((function(acc, group) {
+            for (var line = startLine; line <= endLine; line++) {
+              var content =
+                  this.getContentByLine(line, opt_side, group.element);
+              if (content) {
+                acc.push(content);
+              }
+            }
+            return acc;
+          }).bind(this), []);
+        },
+
+        getCommentThreadByLine: function(lineNumber, opt_side, opt_root) {
+          var content = this.getContentByLine(lineNumber, opt_side, opt_root);
+          return this.getCommentThreadByContentEl(content);
+        },
+
+        getCommentThreadByContentEl: function(contentEl) {
+          if (contentEl.classList.contains('contentText')) {
+            contentEl = contentEl.parentElement;
+          }
+          return contentEl.querySelector('gr-diff-comment-thread');
+        },
+
+        getSideByLineEl: function(lineEl) {
+          return lineEl.classList.contains(GrDiffBuilder.Side.RIGHT) ?
+              GrDiffBuilder.Side.RIGHT : GrDiffBuilder.Side.LEFT;
+        },
+
+        createCommentThread: function(changeNum, patchNum, path, side,
+            projectConfig) {
+          return this._builder.createCommentThread(changeNum, patchNum, path,
+              side, projectConfig);
+        },
+
+        emitGroup: function(group, sectionEl) {
+          this._builder.emitGroup(group, sectionEl);
+        },
+
+        showContext: function(newGroups, sectionEl) {
+          var groups = this._builder.groups;
+          // TODO(viktard): Polyfill findIndex for IE10.
+          var contextIndex = groups.findIndex(function(group) {
+            return group.element == sectionEl;
+          });
+          groups.splice.apply(groups, [contextIndex, 1].concat(newGroups));
+
+          newGroups.forEach(function(newGroup) {
+            this._builder.emitGroup(newGroup, sectionEl);
+          }, this);
+          sectionEl.parentNode.removeChild(sectionEl);
+
+          this.async(function() {
+            this.fire('render');
+          }, 1);
+        },
+
+        _getDiffBuilder: function(diff, comments, prefs) {
+          if (this.isImageDiff) {
+            return new GrDiffBuilderImage(diff, comments, prefs,
+                this.diffElement, this.baseImage, this.revisionImage);
+          } else if (this.viewMode === DiffViewMode.SIDE_BY_SIDE) {
+            return new GrDiffBuilderSideBySide(
+                diff, comments, prefs, this.diffElement);
+          } else if (this.viewMode === DiffViewMode.UNIFIED) {
+            return new GrDiffBuilderUnified(
+                diff, comments, prefs, this.diffElement);
+          }
+          throw Error('Unsupported diff view mode: ' + this.viewMode);
+        },
+
+        _clearDiffContent: function() {
+          this.diffElement.innerHTML = null;
+        },
+
+        _getCommentLocations: function(comments) {
+          var result = {
+            left: {},
+            right: {},
+          };
+          for (var side in comments) {
+            if (side !== GrDiffBuilder.Side.LEFT &&
+                side !== GrDiffBuilder.Side.RIGHT) {
+              continue;
+            }
+            comments[side].forEach(function(c) {
+              result[side][c.line || GrDiffLine.FILE] = true;
+            });
+          }
+          return result;
+        },
+
+        _groupsChanged: function(changeRecord) {
+          if (!changeRecord) { return; }
+          changeRecord.indexSplices.forEach(function(splice) {
+            var group;
+            for (var i = 0; i < splice.addedCount; i++) {
+              group = splice.object[splice.index + i];
+              this._builder.groups.push(group);
+              this._builder.emitGroup(group);
+            }
+          }, this);
+        },
+      });
+    })();
+  </script>
+</dom-module>

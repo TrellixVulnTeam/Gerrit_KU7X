@@ -1,0 +1,99 @@
+= Release notes for Gerrit 2.13
+
+
+Gerrit 2.13 is now available:
+
+link:https://www.gerritcodereview.com/download/gerrit-2.13.war[
+https://www.gerritcodereview.com/download/gerrit-2.13.war]
+
+
+== Important Notes
+
+TODO
+
+
+== Release Highlights
+
+* Metrics interface.
+
+
+== New Features
+
+=== Metrics
+
+Metrics about Gerrit's internal state can be sent to external
+monitoring systems.
+
+The following metrics are supported:
+
+* HTTP responses
++
+TODO details here and in the others
+
+* REST API calls
+
+* SSH sessions
+
+* Caches
+
+* SQL connections
+
+* TODO add more
+
+
+Plugins can provide implementations of the metrics interface to
+report metrics to different monitoring systems. The following
+plugins are available:
+
+* JMX
+
+* Graphite
+
+* Elasticsearch
+
+
+Plugins can also provide metrics.  The following metrics are provided
+by core plugins:
+
+* Replication
+
+** Replication time
+
+* TODO add more
+
+=== Changes
+
+In order to avoid potentially confusing behavior, when submitting changes in a
+batch, submit type rules may not be used to mix submit types on a single branch,
+and trying to submit such a batch will fail.
+
+== Bug Fixes
+
+TODO
+
+
+== Upgrades
+
+* Upgrade CodeMirror to 5.14.2
+
+* Upgrade Guava to 19.0
+
+* Upgrade Gson to 2.6.2
+
+* Upgrade gwtjsonrpc to version 1.8
+
+* Upgrade gwtorm to 1.15
+
+* Upgrade javassist.jar to 3.18.1
+
+* Upgrade Jetty to 9.2.14.v20151106
+
+* Upgrade JGit to 4.3.0.201604071810-r
+
+* Upgrade Lucene to 5.4.1
+
+* Upgrade mina to 2.10
+
+* Upgrade sshd-core to 1.2.0
+
+* Upgrade Truth to 0.28

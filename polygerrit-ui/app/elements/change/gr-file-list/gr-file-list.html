@@ -1,0 +1,189 @@
+<!--
+Copyright (C) 2015 The Android Open Source Project
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+
+<link rel="import" href="../../../bower_components/polymer/polymer.html">
+<link rel="import" href="../../../behaviors/keyboard-shortcut-behavior.html">
+<link rel="import" href="../../diff/gr-diff/gr-diff.html">
+<link rel="import" href="../../diff/gr-diff-cursor/gr-diff-cursor.html">
+<link rel="import" href="../../shared/gr-button/gr-button.html">
+<link rel="import" href="../../shared/gr-rest-api-interface/gr-rest-api-interface.html">
+
+<dom-module id="gr-file-list">
+  <template>
+    <style>
+      :host {
+        display: block;
+      }
+      .row {
+        display: flex;
+        padding: .1em .25em;
+      }
+      header {
+        display: flex;
+        font-weight: bold;
+        justify-content: space-between;
+        margin-bottom: .5em;
+      }
+      .rightControls {
+        font-weight: normal;
+      }
+      .reviewed,
+      .status {
+        align-items: center;
+        display: inline-flex;
+      }
+      .reviewed,
+      .status {
+        display: inline-block;
+        text-align: center;
+        width: 1.5em;
+      }
+      .row:not(.header):hover {
+        background-color: #f5fafd;
+      }
+      .row[selected] {
+        background-color: #ebf5fb;
+      }
+      .path {
+        flex: 1;
+        padding-left: .35em;
+        text-decoration: none;
+        white-space: nowrap;
+      }
+      .path:hover :first-child {
+        text-decoration: underline;
+      }
+      .path,
+      .path div {
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .oldPath {
+        color: #999;
+      }
+      .comments,
+      .stats {
+        text-align: right;
+      }
+      .comments {
+        min-width: 10em;
+      }
+      .stats {
+        min-width: 7em;
+      }
+      .invisible {
+        visibility: hidden;
+      }
+      .row:not(.header) .stats {
+        font-family: var(--monospace-font-family);
+      }
+      .added {
+        color: #388E3C;
+      }
+      .removed {
+        color: #D32F2F;
+      }
+      .drafts {
+        color: #C62828;
+        font-weight: bold;
+      }
+      gr-diff {
+        box-shadow: 0 1px 3px rgba(0, 0, 0, .3);
+        display: block;
+        margin: .25em 0 1em;
+      }
+      @media screen and (max-width: 50em) {
+        .row[selected] {
+          background-color: transparent;
+        }
+        .stats {
+          display: none;
+        }
+        .reviewed,
+        .status {
+          justify-content: flex-start;
+        }
+        .comments {
+          min-width: initial;
+        }
+      }
+    </style>
+    <header>
+      <div>Files</div>
+      <div class="rightControls">
+        <gr-button link on-tap="_expandAllDiffs">Show diffs</gr-button>
+        /
+        <gr-button link on-tap="_collapseAllDiffs">Hide diffs</gr-button>
+        /
+        <label>
+          Diff against
+          <select on-change="_handlePatchChange">
+            <option value="PARENT">Base</option>
+            <template is="dom-repeat" items="[[_computePatchSets(revisions, patchRange.*)]]" as="patchNum">
+              <option
+                  value$="[[patchNum]]"
+                  selected$="[[_computePatchSetSelected(patchNum, patchRange.basePatchNum)]]"
+                  disabled$="[[_computePatchSetDisabled(patchNum, patchRange.patchNum)]]">[[patchNum]]</option>
+            </template>
+          </select>
+        </label>
+      </div>
+    </header>
+    <template is="dom-repeat" items="[[_files]]" as="file">
+      <div class="row" selected$="[[_computeFileSelected(index, selectedIndex)]]">
+        <div class="reviewed" hidden$="[[!_loggedIn]]" hidden>
+          <input type="checkbox" checked$="[[_computeReviewed(file, _reviewed)]]"
+              data-path$="[[file.__path]]" on-change="_handleReviewedChange">
+        </div>
+        <div class$="[[_computeClass('status', file.__path)]]">
+          [[_computeFileStatus(file.status)]]
+        </div>
+        <a class="path" href$="[[_computeDiffURL(changeNum, patchRange, file.__path)]]">
+          <div title$="[[_computeFileDisplayName(file.__path)]]">
+            [[_computeFileDisplayName(file.__path)]]
+          </div>
+          <div class="oldPath" hidden$="[[!file.old_path]]" hidden
+              title$="[[file.old_path]]">
+            [[file.old_path]]
+          </div>
+        </a>
+        <div class="comments">
+          <span class="drafts">[[_computeDraftsString(drafts, patchRange.patchNum, file.__path)]]</span>
+          [[_computeCommentsString(comments, patchRange.patchNum, file.__path)]]
+        </div>
+        <div class$="[[_computeClass('stats', file.__path)]]">
+          <span class="added">+[[file.lines_inserted]]</span>
+          <span class="removed">-[[file.lines_deleted]]</span>
+        </div>
+      </div>
+      <gr-diff hidden
+          project="[[change.project]]"
+          commit="[[change.current_revision]]"
+          change-num="[[changeNum]]"
+          patch-range="[[patchRange]]"
+          path="[[file.__path]]"
+          prefs="[[_diffPrefs]]"
+          project-config="[[projectConfig]]"
+          view-mode="[[_userPrefs.diff_view]]"></gr-diff>
+    </template>
+    <gr-rest-api-interface id="restAPI"></gr-rest-api-interface>
+    <gr-storage id="storage"></gr-storage>
+    <gr-diff-cursor
+        id="cursor"
+        fold-offset-top="[[topMargin]]"></gr-diff-cursor>
+  </template>
+  <script src="gr-file-list.js"></script>
+</dom-module>

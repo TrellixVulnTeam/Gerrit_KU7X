@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<!--
+Copyright (C) 2015 The Android Open Source Project
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+
+<meta name="viewport" content="width=device-width, minimum-scale=1.0, initial-scale=1.0, user-scalable=yes">
+<title>gr-reply-dialog</title>
+
+<script src="../../../bower_components/webcomponentsjs/webcomponents.min.js"></script>
+<script src="../../../bower_components/web-component-tester/browser.js"></script>
+<script src="../../../scripts/util.js"></script>
+
+<link rel="import" href="../../../bower_components/iron-test-helpers/iron-test-helpers.html">
+<link rel="import" href="gr-reply-dialog.html">
+
+<test-fixture id="basic">
+  <template>
+    <gr-reply-dialog></gr-reply-dialog>
+  </template>
+</test-fixture>
+
+<script>
+  suite('gr-reply-dialog tests', function() {
+    var element;
+
+    setup(function() {
+      stub('gr-rest-api-interface', {
+        getAccount: function() { return Promise.resolve({}); },
+      });
+      element = fixture('basic');
+      element.changeNum = 42;
+      element.patchNum = 1;
+      element.labels = {
+        Verified: {
+          values: {
+            '-1': 'Fails',
+            ' 0': 'No score',
+            '+1': 'Verified'
+          },
+          default_value: 0
+        },
+        'Code-Review': {
+          values: {
+            '-2': 'Do not submit',
+            '-1': 'I would prefer that you didn\'t submit this',
+            ' 0': 'No score',
+            '+1': 'Looks good to me, but someone else must approve',
+            '+2': 'Looks good to me, approved'
+          },
+          default_value: 0
+        }
+      };
+      element.permittedLabels = {
+        'Code-Review': [
+          '-1',
+          ' 0',
+          '+1'
+        ],
+        Verified: [
+          '-1',
+          ' 0',
+          '+1'
+        ]
+      };
+
+      // Allow the elements created by dom-repeat to be stamped.
+      flushAsynchronousOperations();
+    });
+
+    test('cancel event', function(done) {
+      element.addEventListener('cancel', function() { done(); });
+      MockInteractions.tap(element.$$('.cancel'));
+    });
+
+    test('show/hide labels', function() {
+      var revisions = {
+        rev1: {_number: 1},
+        rev2: {_number: 2},
+      };
+      assert.isFalse(element._computeShowLabels('1', revisions));
+      assert.isTrue(element._computeShowLabels('2', revisions));
+    });
+
+    test('label picker', function(done) {
+      var showLabelsStub = sinon.stub(element, '_computeShowLabels',
+          function() { return true; });
+      element.revisions = {};
+      element.patchNum = '';
+
+      // Async tick is needed because iron-selector content is distributed and
+      // distributed content requires an observer to be set up.
+      flush(function() {
+        for (var label in element.permittedLabels) {
+          assert.ok(element.$$('iron-selector[data-label="' + label + '"]'),
+              label);
+        }
+        element.draft = 'I wholeheartedly disapprove';
+        MockInteractions.tap(element.$$(
+            'iron-selector[data-label="Code-Review"] > ' +
+            'gr-button[data-value="-1"]'));
+        MockInteractions.tap(element.$$(
+            'iron-selector[data-label="Verified"] > ' +
+            'gr-button[data-value="-1"]'));
+
+        var saveReviewStub = sinon.stub(element, '_saveReview',
+            function(review) {
+          assert.deepEqual(review, {
+            drafts: 'PUBLISH_ALL_REVISIONS',
+            labels: {
+              'Code-Review': -1,
+              'Verified': -1
+            },
+            message: 'I wholeheartedly disapprove'
+          });
+          return Promise.resolve({ok: true});
+        });
+
+        element.addEventListener('send', function() {
+          assert.isFalse(element.disabled,
+              'Element should be enabled when done sending reply.');
+          assert.equal(element.draft.length, 0);
+          saveReviewStub.restore();
+          showLabelsStub.restore();
+          done();
+        });
+
+        // This is needed on non-Blink engines most likely due to the ways in
+        // which the dom-repeat elements are stamped.
+        flush(function() {
+          MockInteractions.tap(element.$$('.send'));
+          assert.isTrue(element.disabled);
+        });
+      });
+    });
+  });
+</script>

@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<!--
+Copyright (C) 2016 The Android Open Source Project
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+
+<meta name="viewport" content="width=device-width, minimum-scale=1.0, initial-scale=1.0, user-scalable=yes">
+<title>gr-diff-builder</title>
+
+<script src="../../../bower_components/webcomponentsjs/webcomponents.min.js"></script>
+<script src="../../../bower_components/web-component-tester/browser.js"></script>
+<script src="../gr-diff/gr-diff-line.js"></script>
+<script src="../gr-diff/gr-diff-group.js"></script>
+<script src="gr-diff-builder.js"></script>
+
+<link rel="import" href="gr-diff-builder.html">
+
+<test-fixture id="basic">
+  <template>
+    <gr-diff-builder>
+      <table id="diffTable"></table>
+    </gr-diff-builder>
+  </template>
+</test-fixture>
+
+<test-fixture id="div-with-text">
+  <template>
+    <div>Lorem ipsum dolor sit amet, suspendisse inceptos vehicula</div>
+  </template>
+</test-fixture>
+
+<script>
+  suite('gr-diff-builder tests', function() {
+    var element;
+    var builder;
+
+    setup(function() {
+      var prefs = {
+        line_length: 10,
+        show_tabs: true,
+        tab_size: 4,
+      };
+      builder = new GrDiffBuilder({content: []}, {left: [], right: []}, prefs);
+    });
+
+    test('context control buttons', function() {
+      var section = {};
+      var line = {contextGroup: {lines: []}};
+
+      // Create 10 lines.
+      for (var i = 0; i < 10; i++) {
+        line.contextGroup.lines.push('lorem upsum');
+      }
+
+      // Does not include +10 buttons when there are fewer than 11 lines.
+      var td = builder._createContextControl(section, line);
+      var buttons = td.querySelectorAll('gr-button.showContext');
+
+      assert.equal(buttons.length, 1);
+      assert.equal(buttons[0].textContent, 'Show 10 common lines');
+
+      // Add another line.
+      line.contextGroup.lines.push('lorem upsum');
+
+      // Includes +10 buttons when there are at least 11 lines.
+      td = builder._createContextControl(section, line);
+      buttons = td.querySelectorAll('gr-button.showContext');
+
+      assert.equal(buttons.length, 3);
+      assert.equal(buttons[0].textContent, '+10↑');
+      assert.equal(buttons[1].textContent, 'Show 11 common lines');
+      assert.equal(buttons[2].textContent, '+10↓');
+    });
+
+    test('newlines', function() {
+      var text = 'abcdef';
+      assert.equal(builder._addNewlines(text, text), text);
+      text = 'a'.repeat(20);
+      assert.equal(builder._addNewlines(text, text),
+          'a'.repeat(10) +
+          GrDiffBuilder.LINE_FEED_HTML +
+          'a'.repeat(10));
+
+      text = '<span class="thumbsup">👍</span>';
+      var html = '&lt;span class=&quot;thumbsup&quot;&gt;👍&lt;&#x2F;span&gt;';
+      assert.equal(builder._addNewlines(text, html),
+          '&lt;span clas' +
+          GrDiffBuilder.LINE_FEED_HTML +
+          's=&quot;thumbsu' +
+          GrDiffBuilder.LINE_FEED_HTML +
+          'p&quot;&gt;👍&lt;&#x2F;spa' +
+          GrDiffBuilder.LINE_FEED_HTML +
+          'n&gt;');
+
+      text = '01234\t56789';
+      assert.equal(builder._addNewlines(text, text),
+          '01234\t5' +
+          GrDiffBuilder.LINE_FEED_HTML +
+          '6789');
+    });
+
+    test('text length with tabs and unicode', function() {
+      assert.equal(builder._textLength('12345', 4), 5);
+      assert.equal(builder._textLength('\t\t12', 4), 10);
+      assert.equal(builder._textLength('abc💢123', 4), 7);
+
+      assert.equal(builder._textLength('abc\t', 8), 8);
+      assert.equal(builder._textLength('abc\t\t', 10), 20);
+      assert.equal(builder._textLength('', 10), 0);
+      assert.equal(builder._textLength('', 10), 0);
+      assert.equal(builder._textLength('abc\tde', 10), 12);
+      assert.equal(builder._textLength('abc\tde\t', 10), 20);
+      assert.equal(builder._textLength('\t\t\t\t\t', 20), 100);
+    });
+
+    test('tab wrapper insertion', function() {
+      var html = 'abc\tdef';
+      var wrapper = builder._getTabWrapper(
+          builder._prefs.tab_size - 3,
+          builder._prefs.show_tabs);
+      assert.ok(wrapper);
+      assert.isAbove(wrapper.length, 0);
+      assert.equal(builder._addTabWrappers(html, builder._prefs.tab_size),
+          'abc' + wrapper + 'def');
+      assert.throws(builder._getTabWrapper.bind(
+          builder,
+          // using \x3c instead of < in string so gjslint can parse
+          '">\x3cimg src="/" onerror="alert(1);">\x3cspan class="',
+          true));
+    });
+
+    test('comments', function() {
+      var line = new GrDiffLine(GrDiffLine.Type.BOTH);
+      line.beforeNumber = 3;
+      line.afterNumber = 5;
+
+      var comments = {left: [], right: []};
+      assert.deepEqual(builder._getCommentsForLine(comments, line), []);
+      assert.deepEqual(builder._getCommentsForLine(comments, line,
+          GrDiffBuilder.Side.LEFT), []);
+      assert.deepEqual(builder._getCommentsForLine(comments, line,
+          GrDiffBuilder.Side.RIGHT), []);
+
+      comments = {
+        left: [
+          {id: 'l3', line: 3},
+          {id: 'l5', line: 5},
+        ],
+        right: [
+          {id: 'r3', line: 3},
+          {id: 'r5', line: 5},
+        ],
+      };
+      assert.deepEqual(builder._getCommentsForLine(comments, line),
+          [{id: 'l3', line: 3}, {id: 'r5', line: 5}]);
+      assert.deepEqual(builder._getCommentsForLine(comments, line,
+          GrDiffBuilder.Side.LEFT), [{id: 'l3', line: 3}]);
+      assert.deepEqual(builder._getCommentsForLine(comments, line,
+          GrDiffBuilder.Side.RIGHT), [{id: 'r5', line: 5}]);
+    });
+
+    test('comment thread creation', function() {
+      builder._comments = {
+        meta: {
+          changeNum: '42',
+          patchRange: {
+            basePatchNum: 'PARENT',
+            patchNum: '3',
+          },
+          path: '/path/to/foo',
+          projectConfig: {foo: 'bar'},
+        },
+        left: [
+          {id: 'l3', line: 3},
+          {id: 'l5', line: 5},
+        ],
+        right: [
+          {id: 'r5', line: 5},
+        ],
+      };
+
+      function checkThreadProps(threadEl, patchNum, side, comments) {
+        assert.equal(threadEl.changeNum, '42');
+        assert.equal(threadEl.patchNum, patchNum);
+        assert.equal(threadEl.path, '/path/to/foo');
+        assert.equal(threadEl.side, side);
+        assert.deepEqual(threadEl.projectConfig, {foo: 'bar'});
+        assert.deepEqual(threadEl.comments, comments);
+      }
+
+      var line = new GrDiffLine(GrDiffLine.Type.BOTH);
+      line.beforeNumber = 5;
+      line.afterNumber = 5;
+      var threadEl = builder._commentThreadForLine(line);
+      checkThreadProps(threadEl, '3', 'REVISION',
+          [{id: 'l5', line: 5}, {id: 'r5', line: 5}]);
+
+      threadEl = builder._commentThreadForLine(line, GrDiffBuilder.Side.RIGHT);
+      checkThreadProps(threadEl, '3', 'REVISION', [{id: 'r5', line: 5}]);
+
+      threadEl = builder._commentThreadForLine(line, GrDiffBuilder.Side.LEFT);
+      checkThreadProps(threadEl, '3', 'PARENT', [{id: 'l5', line: 5}]);
+
+      builder._comments.meta.patchRange.basePatchNum = '1';
+
+      threadEl = builder._commentThreadForLine(line);
+      checkThreadProps(threadEl, '3', 'REVISION',
+          [{id: 'l5', line: 5}, {id: 'r5', line: 5}]);
+
+      threadEl = builder._commentThreadForLine(line, GrDiffBuilder.Side.LEFT);
+      checkThreadProps(threadEl, '1', 'REVISION', [{id: 'l5', line: 5}]);
+
+      threadEl = builder._commentThreadForLine(line, GrDiffBuilder.Side.RIGHT);
+      checkThreadProps(threadEl, '3', 'REVISION', [{id: 'r5', line: 5}]);
+
+      builder._comments.meta.patchRange.basePatchNum = 'PARENT';
+
+      line = new GrDiffLine(GrDiffLine.Type.REMOVE);
+      line.beforeNumber = 5;
+      line.afterNumber = 5;
+      threadEl = builder._commentThreadForLine(line);
+      checkThreadProps(threadEl, '3', 'PARENT',
+          [{id: 'l5', line: 5}, {id: 'r5', line: 5}]);
+
+      line = new GrDiffLine(GrDiffLine.Type.ADD);
+      line.beforeNumber = 3;
+      line.afterNumber = 5;
+      threadEl = builder._commentThreadForLine(line);
+      checkThreadProps(threadEl, '3', 'REVISION',
+          [{id: 'l3', line: 3}, {id: 'r5', line: 5}]);
+    });
+
+    suite('intraline differences', function() {
+      var el;
+      var str;
+      var annotateElementSpy;
+
+      function slice(str, start, end) {
+        return Array.from(str).slice(start, end).join('');
+      }
+
+      setup(function() {
+        el = fixture('div-with-text');
+        str = el.textContent;
+        annotateElementSpy = sinon.spy(GrAnnotation, 'annotateElement');
+      });
+
+      teardown(function() {
+        annotateElementSpy.restore();
+      });
+
+      test('_addIntralineHighlights no highlights', function() {
+        var line = {
+          text: str,
+          highlights: [],
+        };
+
+        GrDiffBuilder.prototype._addIntralineHighlights(el, line);
+
+        // The content is unchanged.
+        assert.isFalse(annotateElementSpy.called);
+        assert.equal(el.childNodes.length, 1);
+        assert.instanceOf(el.childNodes[0], Text);
+        assert.equal(str, el.childNodes[0].textContent);
+      });
+
+      test('_addIntralineHighlights with highlights', function() {
+        var line = {
+          text: str,
+          highlights: [
+            {startIndex: 6, endIndex: 12},
+            {startIndex: 18, endIndex: 22},
+          ],
+        };
+        var str0 = slice(str, 0, 6);
+        var str1 = slice(str, 6, 12);
+        var str2 = slice(str, 12, 18);
+        var str3 = slice(str, 18, 22);
+        var str4 = slice(str, 22);
+
+        GrDiffBuilder.prototype._addIntralineHighlights(el, line);
+
+        assert.isTrue(annotateElementSpy.called);
+        assert.equal(el.childNodes.length, 5);
+
+        assert.instanceOf(el.childNodes[0], Text);
+        assert.equal(el.childNodes[0].textContent, str0);
+
+        assert.notInstanceOf(el.childNodes[1], Text);
+        assert.equal(el.childNodes[1].textContent, str1);
+
+        assert.instanceOf(el.childNodes[2], Text);
+        assert.equal(el.childNodes[2].textContent, str2);
+
+        assert.notInstanceOf(el.childNodes[3], Text);
+        assert.equal(el.childNodes[3].textContent, str3);
+
+        assert.instanceOf(el.childNodes[4], Text);
+        assert.equal(el.childNodes[4].textContent, str4);
+      });
+
+      test('_addIntralineHighlights without endIndex', function() {
+        var line = {
+          text: str,
+          highlights: [
+            {startIndex: 28},
+          ],
+        };
+
+        var str0 = slice(str, 0, 28);
+        var str1 = slice(str, 28);
+
+        GrDiffBuilder.prototype._addIntralineHighlights(el, line);
+
+        assert.isTrue(annotateElementSpy.called);
+        assert.equal(el.childNodes.length, 2);
+
+        assert.instanceOf(el.childNodes[0], Text);
+        assert.equal(el.childNodes[0].textContent, str0);
+
+        assert.notInstanceOf(el.childNodes[1], Text);
+        assert.equal(el.childNodes[1].textContent, str1);
+      });
+
+      test('_addIntralineHighlights ignores empty highlights', function() {
+        var line = {
+          text: str,
+          highlights: [
+            {startIndex: 28, endIndex: 28},
+          ],
+        };
+
+        GrDiffBuilder.prototype._addIntralineHighlights(el, line);
+
+        assert.isFalse(annotateElementSpy.called);
+        assert.equal(el.childNodes.length, 1);
+      });
+
+      test('_addIntralineHighlights handles unicode', function() {
+        // Put some unicode into the string:
+        str = str.replace(/\s/g, '💢');
+        el.textContent = str;
+
+        var line = {
+          text: str,
+          highlights: [
+            {startIndex: 6, endIndex: 12},
+          ],
+        };
+
+        var str0 = slice(str, 0, 6);
+        var str1 = slice(str, 6, 12);
+        var str2 = slice(str, 12);
+
+        GrDiffBuilder.prototype._addIntralineHighlights(el, line);
+
+        assert.isTrue(annotateElementSpy.called);
+        assert.equal(el.childNodes.length, 3);
+
+        assert.instanceOf(el.childNodes[0], Text);
+        assert.equal(el.childNodes[0].textContent, str0);
+
+        assert.notInstanceOf(el.childNodes[1], Text);
+        assert.equal(el.childNodes[1].textContent, str1);
+
+        assert.instanceOf(el.childNodes[2], Text);
+        assert.equal(el.childNodes[2].textContent, str2);
+      });
+
+      test('_addIntralineHighlights handles unicode w/o endIndex', function() {
+        // Put some unicode into the string:
+        str = str.replace(/\s/g, '💢');
+        el.textContent = str;
+
+        var line = {
+          text: str,
+          highlights: [
+            {startIndex: 6},
+          ],
+        };
+
+        var str0 = slice(str, 0, 6);
+        var str1 = slice(str, 6);
+
+        GrDiffBuilder.prototype._addIntralineHighlights(el, line);
+
+        assert.isTrue(annotateElementSpy.called);
+        assert.equal(el.childNodes.length, 2);
+
+        assert.instanceOf(el.childNodes[0], Text);
+        assert.equal(el.childNodes[0].textContent, str0);
+
+        assert.notInstanceOf(el.childNodes[1], Text);
+        assert.equal(el.childNodes[1].textContent, str1);
+      });
+    });
+
+    suite('rendering', function() {
+      var content;
+      var outputEl;
+
+      setup(function(done) {
+        var prefs = {
+          line_length: 10,
+          show_tabs: true,
+          tab_size: 4,
+          context: -1
+        };
+        content = [
+          {
+            a: ['all work and no play make andybons a dull boy'],
+            b: ['elgoog elgoog elgoog']
+          },
+          {
+            ab: [
+              'Non eram nescius, Brute, cum, quae summis ingeniis ',
+              'exquisitaque doctrina philosophi Graeco sermone tractavissent',
+            ]
+          },
+        ];
+        element = fixture('basic');
+        outputEl = element.queryEffectiveChildren('#diffTable');
+        element.addEventListener('render', function() {
+          done();
+        });
+        sinon.stub(element, '_getDiffBuilder', function() {
+          var builder = new GrDiffBuilder(
+              {content: content}, {left: [], right: []}, prefs, outputEl);
+          builder.buildSectionElement = function(group) {
+            var section = document.createElement('stub');
+            section.textContent = group.lines.reduce(function(acc, line) {
+              return acc + line.text;
+            }, '');
+            return section;
+          };
+          return builder;
+        });
+        element.render({content: content}, {left: [], right: []}, prefs);
+      });
+
+      test('renderSection', function() {
+        var section = outputEl.querySelector('stub:nth-of-type(2)');
+        var prevInnerHTML = section.innerHTML;
+        section.innerHTML = 'wiped';
+        element._builder.renderSection(section);
+        section = outputEl.querySelector('stub:nth-of-type(2)');
+        assert.equal(section.innerHTML, prevInnerHTML);
+      });
+
+      test('getSectionsByLineRange one line', function() {
+        var section = outputEl.querySelector('stub:nth-of-type(2)');
+        var sections = element._builder.getSectionsByLineRange(1, 1, 'left');
+        assert.equal(sections.length, 1);
+        assert.strictEqual(sections[0], section);
+      });
+
+      test('getSectionsByLineRange over diff', function() {
+        var section = [
+          outputEl.querySelector('stub:nth-of-type(2)'),
+          outputEl.querySelector('stub:nth-of-type(3)'),
+        ];
+        var sections = element._builder.getSectionsByLineRange(1, 2, 'left');
+        assert.equal(sections.length, 2);
+        assert.strictEqual(sections[0], section[0]);
+        assert.strictEqual(sections[1], section[1]);
+      });
+    });
+  });
+</script>
